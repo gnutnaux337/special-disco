@@ -47,7 +47,7 @@ async function signOut() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto p-6">
+  <div class="max-w-2xl mx-auto p-6 min-h-screen flex flex-col">
     <header class="flex justify-between items-center mb-8">
       <nav class="flex gap-6">
         <RouterLink to="/" class="underline">Home</RouterLink>
@@ -57,13 +57,14 @@ async function signOut() {
 
       <div>
         <button v-if="!auth.user" @click="signIn" class="underline">Sign in with GitHub</button>
-        <div v-else class="flex items-center gap-3">
-          <span>{{ auth.user.email || auth.user.user_metadata?.user_name }}</span>
-          <button @click="signOut" class="underline">Sign Out</button>
-        </div>
+        <div v-else><button @click="signOut" class="underline">Sign Out</button></div>
       </div>
     </header>
 
-    <RouterView />
+    <RouterView class="flex-1" />
+
+    <footer v-if="auth.user" class="text-right">
+      {{ auth.user.email || auth.user.user_metadata?.user_name }}
+    </footer>
   </div>
 </template>
