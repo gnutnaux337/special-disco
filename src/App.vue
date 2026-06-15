@@ -1,85 +1,69 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/auth'
+import { initOctokit } from '@/lib/github'
+
+const auth = useAuthStore()
+
+onMounted(async () => {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      auth.setSession({
+        user: session.user,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        provider_token: session.provider_token,
+      })
+      if (session.provider_token) {
+        initOctokit(session.provider_token)
+      }
+    }
+  })
+
+  await auth.restoreSession()
+
+  if (auth.providerToken) {
+    initOctokit(auth.providerToken)
+  }
+
+  if (window.location.hash.includes('access_token')) {
+    window.location.hash = ''
+  }
+})
+
+async function signIn() {
+  try {
+    await auth.signInWithGithub()
+  } catch (e) {
+    console.error('Sign in failed:', e)
+  }
+}
+
+async function signOut() {
+  await auth.signOut()
+}
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+  <div class="max-w-2xl mx-auto p-6">
+    <header class="flex justify-between items-center mb-8">
+      <nav class="flex gap-6">
+        <RouterLink to="/" class="underline">Home</RouterLink>
+        <RouterLink to="/about" class="underline">About</RouterLink>
+        <RouterLink to="/posts" class="underline">Posts</RouterLink>
       </nav>
-    </div>
-  </header>
 
-  <RouterView />
+      <div>
+        <button v-if="!auth.user" @click="signIn" class="underline">Sign in with GitHub</button>
+        <div v-else class="flex items-center gap-3">
+          <span>{{ auth.user.email || auth.user.user_metadata?.user_name }}</span>
+          <button @click="signOut" class="underline">Sign Out</button>
+        </div>
+      </div>
+    </header>
+
+    <RouterView />
+  </div>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style>
