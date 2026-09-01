@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { initOctokit } from '@/lib/github'
 
 const auth = useAuthStore()
+const router = useRouter()
 
 onMounted(async () => {
+  // Restore a deep link after the GitHub Pages 404.html redirect.
+  const redirect = sessionStorage.getItem('redirect')
+  if (redirect) {
+    sessionStorage.removeItem('redirect')
+    const base = import.meta.env.BASE_URL.replace(/\/+$/, '')
+    router.replace(redirect.startsWith(base) ? redirect.slice(base.length) : redirect)
+  }
+
   supabase.auth.onAuthStateChange((event, session) => {
     if (session) {
       auth.setSession({
