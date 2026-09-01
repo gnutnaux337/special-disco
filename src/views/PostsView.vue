@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { listPosts, createPost, deletePost } from '@/lib/github'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -16,7 +17,6 @@ const newContent = ref('')
 const { data: posts, isLoading, error } = useQuery({
   queryKey: ['posts'],
   queryFn: listPosts,
-  enabled: !!auth.accessToken,
   staleTime: 30_000,
 })
 
@@ -29,8 +29,8 @@ const createMutation = useMutation({
 })
 
 const deleteMutation = useMutation({
-  mutationFn: ({ path, sha, name }: { path: string; sha: string; name: string }) =>
-    deletePost(path, sha, `Delete ${name}`),
+  mutationFn: ({ path, name }: { path: string; name: string }) =>
+    deletePost(path, `Delete ${name}`),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['posts'] })
   },
@@ -53,9 +53,9 @@ async function handleCreate() {
   } catch {}
 }
 
-async function handleDelete(path: string, sha: string, name: string) {
+async function handleDelete(path: string, name: string) {
   if (!confirm(`Delete "${name}"?`)) return
-  await deleteMutation.mutateAsync({ path, sha, name })
+  await deleteMutation.mutateAsync({ path, name })
 }
 </script>
 
@@ -72,45 +72,40 @@ async function handleDelete(path: string, sha: string, name: string) {
       </button>
     </div>
 
-    <div v-if="!auth.accessToken" class="py-8 text-gray-500">
-      <p>Sign in with GitHub to view and manage posts.</p>
+    <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 max-w-lg">
+      <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="border p-2 font-mono" />
+      <MarkdownEditor v-model="newContent" :rows="8" />
+      <button
+        :disabled="createMutation.isPending.value"
+        @click="handleCreate"
+        class="underline cursor-pointer"
+      >
+        {{ createMutation.isPending.value ? 'Creating...' : 'Create' }}
+      </button>
     </div>
 
-    <template v-else>
-      <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 max-w-lg">
-        <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="border p-2 font-mono" />
-        <textarea v-model="newContent" placeholder="Post content..." rows="10" class="border p-2 font-mono"></textarea>
+    <div v-if="isLoading">Loading...</div>
+    <div v-if="error" class="text-red-600">{{ (error as Error).message }}</div>
+
+    <ul v-if="!isLoading" class="list-none p-0">
+      <li
+        v-for="post in posts ?? []"
+        :key="post.path"
+        class="flex items-center justify-between py-2 border-b border-gray-200"
+      >
+        <span class="underline cursor-pointer flex-1 hover:bg-gray-100" @click="viewPost(post.path)">{{ post.name }}</span>
         <button
-          :disabled="createMutation.isPending.value"
-          @click="handleCreate"
-           class="underline cursor-pointer"
-         >
-           {{ createMutation.isPending.value ? 'Creating...' : 'Create' }}
-        </button>
-      </div>
-
-      <div v-if="isLoading">Loading...</div>
-      <div v-if="error" class="text-red-600">{{ (error as Error).message }}</div>
-
-      <ul v-if="!isLoading" class="list-none p-0">
-        <li
-          v-for="post in posts ?? []"
-          :key="post.sha"
-          class="flex items-center justify-between py-2 border-b border-gray-200"
+          v-if="auth.accessToken"
+          class="text-red-600 underline cursor-pointer"
+          :disabled="deleteMutation.isPending.value"
+          @click="handleDelete(post.path, post.name)"
         >
-          <span class="underline cursor-pointer flex-1 hover:bg-gray-100" @click="viewPost(post.path)">{{ post.name }}</span>
-          <button
-            class="text-red-600 underline cursor-pointer"
-            :disabled="deleteMutation.isPending.value"
-            @click="handleDelete(post.path, post.sha, post.name)"
-          >
-            Delete
-          </button>
-        </li>
-        <li v-if="!isLoading && (posts ?? []).length === 0" class="py-2">
-          <em>No posts found in the posts/ folder.</em>
-        </li>
-      </ul>
-    </template>
+          Delete
+        </button>
+      </li>
+      <li v-if="!isLoading && (posts ?? []).length === 0" class="py-2">
+        <em>No posts found in the posts/ folder.</em>
+      </li>
+    </ul>
   </div>
 </template>

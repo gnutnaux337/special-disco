@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { getPost, updatePost, deletePost } from '@/lib/github'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -17,13 +20,12 @@ const editedContent = ref('')
 const { data: post, isLoading, error } = useQuery({
   queryKey: ['post', postPath],
   queryFn: () => getPost(postPath),
-  enabled: !!auth.accessToken,
   staleTime: 30_000,
 })
 
 const updateMutation = useMutation({
   mutationFn: (content: string) =>
-    updatePost(postPath, post.value!.sha, content, `Update ${post.value!.name}`),
+    updatePost(postPath, content, `Update ${post.value!.name}`),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['post', postPath] })
     queryClient.invalidateQueries({ queryKey: ['posts'] })
@@ -31,8 +33,7 @@ const updateMutation = useMutation({
 })
 
 const deleteMutation = useMutation({
-  mutationFn: () =>
-    deletePost(postPath, post.value!.sha, `Delete ${post.value!.name}`),
+  mutationFn: () => deletePost(postPath, `Delete ${post.value!.name}`),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['posts'] })
     router.push('/posts')
@@ -58,25 +59,30 @@ async function handleDelete() {
   await deleteMutation.mutateAsync()
 }
 
-const saveDisabled = computed(() => updateMutation.isPending.value)
+const rendered = computed(() =>
+  DOMPurify.sanitize(marked.parse(post.value?.content ?? '') as string),
+)
 </script>
 
 <template>
   <div>
     <button class="mb-4 underline cursor-pointer" @click="router.push('/posts')">← Back to Posts</button>
 
-    <div v-if="!auth.accessToken" class="py-8 text-gray-500">
-      <p>Sign in with GitHub to view posts.</p>
-    </div>
-
-    <div v-else-if="isLoading">Loading...</div>
+    <div v-if="isLoading">Loading...</div>
     <div v-else-if="error" class="text-red-600">{{ (error as Error).message }}</div>
 
     <div v-else-if="post">
       <div class="flex items-center gap-4 mb-4">
         <h1 class="text-xl font-bold m-0">{{ post.name }}</h1>
-        <button @click="toggleEdit" class="underline cursor-pointer">{{ editMode ? 'Cancel' : 'Edit' }}</button>
         <button
+          v-if="auth.accessToken"
+          @click="toggleEdit"
+          class="underline cursor-pointer"
+        >
+          {{ editMode ? 'Cancel' : 'Edit' }}
+        </button>
+        <button
+          v-if="auth.accessToken"
           class="text-red-600 underline cursor-pointer"
           :disabled="deleteMutation.isPending.value"
           @click="handleDelete"
@@ -86,13 +92,17 @@ const saveDisabled = computed(() => updateMutation.isPending.value)
       </div>
 
       <div v-if="editMode">
-        <textarea v-model="editedContent" rows="20" class="w-full border p-2 font-mono mb-2"></textarea>
-        <button :disabled="saveDisabled" class="underline cursor-pointer">
+        <MarkdownEditor v-model="editedContent" :rows="20" />
+        <button
+          :disabled="updateMutation.isPending.value"
+          @click="save"
+          class="underline cursor-pointer mt-2"
+        >
           {{ updateMutation.isPending.value ? 'Saving...' : 'Save' }}
         </button>
       </div>
 
-      <pre v-else class="whitespace-pre-wrap bg-gray-50 p-4 rounded font-mono">{{ post.content }}</pre>
+      <div v-else class="post-body" v-html="rendered"></div>
     </div>
   </div>
 </template>
