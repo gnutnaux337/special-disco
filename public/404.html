@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Redirecting…</title>
+  <script>
+    // GitHub Pages serves this for any unknown path (e.g. a deep link like
+    // /special-disco/posts). Stash the intended route, then load the SPA root.
+    sessionStorage.redirect = location.pathname + location.search + location.hash
+    location.replace('/special-disco/')
+  </script>
+</head>
+<body></body>
+</html>
