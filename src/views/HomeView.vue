@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 
-const USERNAME = (import.meta.env.VITE_GITHUB_REPO || 'gnutnaux337/special-disco').split('/')[0]
+const USERNAME = '1cedrus'
 
 interface GitHubProfile {
   login: string
