@@ -39,6 +39,8 @@ const { data: profile } = useQuery({
       <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-4 text-sm">
         <span v-if="profile.location">📍 {{ profile.location }}</span>
         <a v-if="profile.blog" :href="profile.blog" target="_blank" rel="noopener" class="underline">🌐 {{ profile.blog }}</a>
+        <a href="https://www.linkedin.com/in/1cedrus/" target="_blank" rel="noopener" class="underline">💼 LinkedIn</a>
+        <a href="mailto:aowiej23s@gmail.com" class="underline">✉️ aowiej23s@gmail.com</a>
         <a :href="profile.html_url" target="_blank" rel="noopener" class="underline">GitHub</a>
       </div>
     </template>
