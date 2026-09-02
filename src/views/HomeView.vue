@@ -26,7 +26,7 @@ const { data: profile } = useQuery({
 </script>
 
 <template>
-  <main class="flex flex-col items-center justify-center text-center py-8">
+  <main class="flex flex-col items-center justify-start text-center pt-8">
     <template v-if="profile">
       <img
         :src="profile.avatar_url"
