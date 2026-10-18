@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { uploadImage } from '@/lib/github'
+import { uploadMedia } from '@/lib/github'
 
 const props = defineProps<{ modelValue: string; rows?: number }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -16,13 +16,13 @@ async function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file || !file.type.startsWith('image/')) return
+  if (!file || !/^(image|video)\//.test(file.type)) return
 
   uploading.value = true
   try {
     const name = `${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
-    const url = await uploadImage(name, file)
-    const alt = file.name.replace(/\.[^.]+$/, '') || 'image'
+    const url = await uploadMedia(name, file)
+    const alt = file.name.replace(/\.[^.]+$/, '') || 'media'
     emit('update:modelValue', `${props.modelValue}\n![${alt}](${url})\n`)
   } catch (e) {
     alert(`Upload failed: ${(e as Error).message}`)
@@ -41,9 +41,9 @@ async function onFile(event: Event) {
         :disabled="uploading"
         @click="fileInput?.click()"
       >
-        {{ uploading ? 'Uploading…' : 'Upload image' }}
+        {{ uploading ? 'Uploading…' : 'Upload image/video' }}
       </button>
-      <span class="text-gray-400">Images save to the repo and render centered.</span>
+      <span class="text-gray-400">Media saves to the repo (max 100MB). Videos render with controls.</span>
     </div>
     <textarea
       :value="modelValue"
@@ -54,7 +54,7 @@ async function onFile(event: Event) {
     <input
       ref="fileInput"
       type="file"
-      accept="image/*"
+      accept="image/*,video/*"
       class="hidden"
       @change="onFile"
     />

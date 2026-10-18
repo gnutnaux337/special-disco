@@ -11,6 +11,19 @@ export function initOctokit(token: string) {
   _octokit = new Octokit({ auth: token })
 }
 
+// Only users with push access to the repo may create, edit or delete posts.
+export async function canWriteRepo(): Promise<boolean> {
+  try {
+    const { data } = await getOctokit().request('GET /repos/{owner}/{repo}', {
+      owner: OWNER,
+      repo: REPO_NAME,
+    })
+    return !!(data.permissions?.push || data.permissions?.admin)
+  } catch {
+    return false
+  }
+}
+
 function getOctokit(): Octokit {
   if (!_octokit) throw new Error('Octokit not initialized. Sign in first.')
   return _octokit
@@ -127,8 +140,8 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-// Commit an image into posts/images/ and return its public raw URL.
-export async function uploadImage(name: string, blob: Blob): Promise<string> {
+// Commit an image or video into posts/images/ and return its public raw URL.
+export async function uploadMedia(name: string, blob: Blob): Promise<string> {
   const octokit = getOctokit()
   const path = `${POSTS_PATH}/images/${name}`
 
