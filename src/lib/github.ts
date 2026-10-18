@@ -27,7 +27,7 @@ function getToken(): string | null {
 
 // Authenticated GitHub API read (5000 req/h instead of 60). Falls back to an
 // anonymous request if the stored token is expired or revoked.
-async function apiFetch(url: string): Promise<Response> {
+export async function apiFetch(url: string): Promise<Response> {
   const token = getToken()
   if (token) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })

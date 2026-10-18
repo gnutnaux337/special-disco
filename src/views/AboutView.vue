@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
+import { apiFetch } from '@/lib/github'
 
 const USERNAME = '1cedrus'
 
@@ -16,7 +17,7 @@ interface Repo {
 const { data: repos, isLoading, error } = useQuery({
   queryKey: ['repos', USERNAME],
   queryFn: async () => {
-    const res = await fetch(
+    const res = await apiFetch(
       `https://api.github.com/users/${USERNAME}/repos?per_page=100&sort=updated&type=public`,
     )
     if (!res.ok) throw new Error(`Failed to load repos (${res.status})`)

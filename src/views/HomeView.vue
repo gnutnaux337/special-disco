@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
+import { apiFetch } from '@/lib/github'
 
 const USERNAME = '1cedrus'
 
@@ -17,7 +18,7 @@ interface GitHubProfile {
 const { data: profile } = useQuery({
   queryKey: ['profile', USERNAME],
   queryFn: async () => {
-    const res = await fetch(`https://api.github.com/users/${USERNAME}`)
+    const res = await apiFetch(`https://api.github.com/users/${USERNAME}`)
     if (!res.ok) throw new Error(`Failed to load profile (${res.status})`)
     return res.json() as Promise<GitHubProfile>
   },
