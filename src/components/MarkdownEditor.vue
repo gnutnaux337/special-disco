@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { uploadMedia } from '@/lib/github'
+import { encryptBytes } from '@/lib/crypto'
+import ProgressBar from '@/components/ProgressBar.vue'
 
-const props = defineProps<{ modelValue: string; rows?: number }>()
+const props = defineProps<{ modelValue: string; rows?: number; encrypt?: boolean; password?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const fileInput = ref<HTMLInputElement>()
-const uploading = ref(false)
+const progress = ref<{ label: string; value: number } | null>(null)
 
 function onInput(event: Event) {
   emit('update:modelValue', (event.target as HTMLTextAreaElement).value)
@@ -17,17 +19,32 @@ async function onFile(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file || !/^(image|video)\//.test(file.type)) return
+  if (props.encrypt && !props.password) {
+    alert('Enter a password first, or turn encryption off.')
+    return
+  }
 
-  uploading.value = true
+  progress.value = { label: 'Preparing…', value: 0 }
   try {
-    const name = `${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
-    const url = await uploadMedia(name, file)
+    let name = `${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
+    let blob: Blob = file
+    if (props.encrypt) {
+      const data = await encryptBytes(new Uint8Array(await file.arrayBuffer()), props.password!, (f) => {
+        progress.value = { label: 'Encrypting…', value: f }
+      })
+      blob = new Blob([data as BlobPart])
+      name += '.enc'
+    }
+    progress.value = { label: 'Uploading…', value: 0 }
+    const url = await uploadMedia(name, blob, (f) => {
+      progress.value = { label: 'Uploading…', value: f }
+    })
     const alt = file.name.replace(/\.[^.]+$/, '') || 'media'
     emit('update:modelValue', `${props.modelValue}\n![${alt}](${url})\n`)
   } catch (e) {
     alert(`Upload failed: ${(e as Error).message}`)
   } finally {
-    uploading.value = false
+    progress.value = null
   }
 }
 </script>
@@ -38,13 +55,14 @@ async function onFile(event: Event) {
       <button
         type="button"
         class="underline cursor-pointer whitespace-nowrap"
-        :disabled="uploading"
+        :disabled="!!progress"
         @click="fileInput?.click()"
       >
-        {{ uploading ? 'Uploading…' : 'Upload image/video' }}
+        Upload image/video
       </button>
       <span class="text-gray-400 text-right">Media saves to the repo (max 100MB). Videos render with controls.</span>
     </div>
+    <ProgressBar v-if="progress" :label="progress.label" :value="progress.value" />
     <textarea
       :value="modelValue"
       :rows="rows ?? 10"

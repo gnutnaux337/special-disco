@@ -2,7 +2,7 @@
 // repo and served from raw.githubusercontent.com). Uploaded files get a
 // unique timestamped name, so a cached copy never goes stale.
 const CACHE = 'post-media-v1'
-const MEDIA = /\.(png|jpe?g|gif|webp|avif|svg|mp4|webm|ogg|mov|m4v)$/i
+const MEDIA = /\.(png|jpe?g|gif|webp|avif|svg|mp4|webm|ogg|mov|m4v|enc)$/i
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024
 
 self.addEventListener('install', () => self.skipWaiting())
