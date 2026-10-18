@@ -38,6 +38,24 @@ export interface Post {
 export interface PostSummary {
   name: string
   path: string
+  createdAt?: string
+}
+
+// The Contents API has no dates, so a file's creation time is the date of the
+// oldest commit that touched it (last page of a per_page=1 commit listing).
+async function getCreatedAt(path: string): Promise<string | undefined> {
+  const base = `https://api.github.com/repos/${OWNER}/${REPO_NAME}/commits?sha=${BRANCH}&path=${encodeURIComponent(path)}&per_page=1`
+  try {
+    const first = await fetch(base)
+    if (!first.ok) return undefined
+    const last = first.headers.get('link')?.match(/[?&]page=(\d+)>; rel="last"/)?.[1]
+    const res = last ? await fetch(`${base}&page=${last}`) : first
+    if (!res.ok) return undefined
+    const [commit] = await res.json()
+    return commit?.commit?.committer?.date ?? commit?.commit?.author?.date
+  } catch {
+    return undefined
+  }
 }
 
 // Reads are public (the repo is public), so no token is needed.
@@ -48,9 +66,16 @@ export async function listPosts(): Promise<PostSummary[]> {
   if (!res.ok) throw new Error(`Failed to list posts (${res.status})`)
   const data = await res.json()
   if (!Array.isArray(data)) return []
-  return data
+  const files: PostSummary[] = data
     .filter((item: { type?: string }) => item.type === 'file')
     .map((item: { name: string; path: string }) => ({ name: item.name, path: item.path }))
+  await Promise.all(
+    files.map(async (f) => {
+      f.createdAt = await getCreatedAt(f.path)
+    }),
+  )
+  // Newest first; posts without a known date go last.
+  return files.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 
 // raw.githubusercontent: plain text (no base64 inflation) and browser-cacheable,

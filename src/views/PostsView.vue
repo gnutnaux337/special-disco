@@ -17,7 +17,7 @@ const newContent = ref('')
 const { data: posts, isLoading, error } = useQuery({
   queryKey: ['posts'],
   queryFn: listPosts,
-  staleTime: 30_000,
+  staleTime: 300_000,
 })
 
 const createMutation = useMutation({
@@ -94,6 +94,9 @@ async function handleDelete(path: string, name: string) {
         class="flex items-center justify-between py-2 border-b border-gray-200"
       >
         <span class="underline cursor-pointer flex-1 hover:bg-gray-100" @click="viewPost(post.path)">{{ post.name }}</span>
+        <span v-if="post.createdAt" class="text-gray-400 text-sm mx-4">{{
+          new Date(post.createdAt).toLocaleDateString()
+        }}</span>
         <button
           v-if="auth.canWrite"
           class="text-red-600 underline cursor-pointer"
