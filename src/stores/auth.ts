@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabase'
+import { initOctokit, canWriteRepo } from '@/lib/github'
 import type { User } from '@supabase/supabase-js'
 
 const STORAGE_KEY = 'sb-auth'
@@ -33,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
   const providerToken = ref<string | null>(null)
+  const canWrite = ref(false)
 
   const saved = loadSession()
   if (saved) {
@@ -58,11 +60,19 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  async function refreshPermissions() {
+    canWrite.value = false
+    if (!providerToken.value) return
+    initOctokit(providerToken.value)
+    canWrite.value = await canWriteRepo()
+  }
+
   function clearSession() {
     user.value = null
     accessToken.value = null
     refreshToken.value = null
     providerToken.value = null
+    canWrite.value = false
     saveSession(null)
   }
 
@@ -101,6 +111,8 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken,
     providerToken,
+    canWrite,
+    refreshPermissions,
     signInWithGithub,
     restoreSession,
     setSession,

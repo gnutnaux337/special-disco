@@ -64,7 +64,7 @@ async function handleDelete(path: string, name: string) {
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-xl font-bold m-0">Posts</h1>
       <button
-        v-if="auth.accessToken"
+        v-if="auth.canWrite"
         @click="showCreateForm = !showCreateForm"
         class="underline cursor-pointer"
       >
@@ -95,7 +95,7 @@ async function handleDelete(path: string, name: string) {
       >
         <span class="underline cursor-pointer flex-1 hover:bg-gray-100" @click="viewPost(post.path)">{{ post.name }}</span>
         <button
-          v-if="auth.accessToken"
+          v-if="auth.canWrite"
           class="text-red-600 underline cursor-pointer"
           :disabled="deleteMutation.isPending.value"
           @click="handleDelete(post.path, post.name)"

@@ -4,8 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { getPost, updatePost, deletePost } from '@/lib/github'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { renderMarkdown } from '@/lib/markdown'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const auth = useAuthStore()
@@ -60,7 +59,7 @@ async function handleDelete() {
 }
 
 const rendered = computed(() =>
-  DOMPurify.sanitize(marked.parse(post.value?.content ?? '') as string),
+  renderMarkdown(post.value?.content ?? ''),
 )
 </script>
 
@@ -75,14 +74,14 @@ const rendered = computed(() =>
       <div class="flex items-center gap-4 mb-4">
         <h1 class="text-xl font-bold m-0">{{ post.name }}</h1>
         <button
-          v-if="auth.accessToken"
+          v-if="auth.canWrite"
           @click="toggleEdit"
           class="underline cursor-pointer"
         >
           {{ editMode ? 'Cancel' : 'Edit' }}
         </button>
         <button
-          v-if="auth.accessToken"
+          v-if="auth.canWrite"
           class="text-red-600 underline cursor-pointer"
           :disabled="deleteMutation.isPending.value"
           @click="handleDelete"

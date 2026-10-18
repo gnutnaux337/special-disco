@@ -3,7 +3,6 @@ import { onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
-import { initOctokit } from '@/lib/github'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -26,7 +25,7 @@ onMounted(async () => {
         provider_token: session.provider_token,
       })
       if (session.provider_token) {
-        initOctokit(session.provider_token)
+        auth.refreshPermissions()
       }
     }
   })
@@ -34,7 +33,7 @@ onMounted(async () => {
   await auth.restoreSession()
 
   if (auth.providerToken) {
-    initOctokit(auth.providerToken)
+    await auth.refreshPermissions()
   }
 
   if (window.location.hash.includes('access_token')) {
