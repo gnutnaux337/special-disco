@@ -13,6 +13,12 @@
   margin: 1.5rem auto;
   border-radius: 8px;
 }
+.post-body video {
+  width: 100%;
+  /* Reserve a 16:9 box until metadata loads; the video's own ratio takes over after. */
+  aspect-ratio: auto 16 / 9;
+  background: #000;
+}
 .post-body pre {
   background: #f6f8fa;
   padding: 1rem;
