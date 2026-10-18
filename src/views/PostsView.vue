@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { listPosts, createPost, deletePost } from '@/lib/github'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import EncryptionFields from '@/components/EncryptionFields.vue'
+import ProgressBar from '@/components/ProgressBar.vue'
+import { encryptBytes } from '@/lib/crypto'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -13,15 +16,18 @@ const queryClient = useQueryClient()
 const showCreateForm = ref(false)
 const newFilename = ref('')
 const newContent = ref('')
+const encrypt = ref(false)
+const newPassword = ref('')
+const encryptProgress = ref<number | null>(null)
 
 const { data: posts, isLoading, error } = useQuery({
-  queryKey: ['posts'],
+  queryKey: ['posts', computed(() => !!auth.providerToken)],
   queryFn: listPosts,
   staleTime: 300_000,
 })
 
 const createMutation = useMutation({
-  mutationFn: ({ filename, content }: { filename: string; content: string }) =>
+  mutationFn: ({ filename, content }: { filename: string; content: string | Uint8Array }) =>
     createPost(filename, content, `Create ${filename}`),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['posts'] })
@@ -45,12 +51,26 @@ async function handleCreate() {
   const filename = newFilename.value.endsWith('.md')
     ? newFilename.value
     : `${newFilename.value}.md`
+  if (encrypt.value && !newPassword.value) {
+    alert('Enter a password, or turn encryption off.')
+    return
+  }
   try {
-    await createMutation.mutateAsync({ filename, content: newContent.value })
+    const content = encrypt.value
+      ? await encryptBytes(new TextEncoder().encode(newContent.value), newPassword.value, (f) => {
+          encryptProgress.value = f
+        })
+      : newContent.value
+    await createMutation.mutateAsync({ filename, content })
     showCreateForm.value = false
     newFilename.value = ''
     newContent.value = ''
-  } catch {}
+    encrypt.value = false
+    newPassword.value = ''
+  } catch {
+  } finally {
+    encryptProgress.value = null
+  }
 }
 
 async function handleDelete(path: string, name: string) {
@@ -74,7 +94,10 @@ async function handleDelete(path: string, name: string) {
 
     <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 w-full">
       <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="w-full border border-gray-300 p-3 font-mono focus:outline-none focus:border-black" />
-      <MarkdownEditor v-model="newContent" :rows="8" />
+      <EncryptionFields v-model:enabled="encrypt" v-model:password="newPassword" />
+      <MarkdownEditor v-model="newContent" :rows="8" :encrypt="encrypt" :password="newPassword" />
+      <ProgressBar v-if="encryptProgress !== null" label="Encrypting…" :value="encryptProgress" />
+      <ProgressBar v-else-if="createMutation.isPending.value" label="Saving…" />
       <button
         :disabled="createMutation.isPending.value"
         @click="handleCreate"
