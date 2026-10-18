@@ -34,21 +34,21 @@ async function onFile(event: Event) {
 
 <template>
   <div class="flex flex-col gap-1">
-    <div class="flex items-center justify-between text-sm">
+    <div class="flex items-center justify-between gap-4 text-sm">
       <button
         type="button"
-        class="underline cursor-pointer"
+        class="underline cursor-pointer whitespace-nowrap"
         :disabled="uploading"
         @click="fileInput?.click()"
       >
         {{ uploading ? 'Uploading…' : 'Upload image/video' }}
       </button>
-      <span class="text-gray-400">Media saves to the repo (max 100MB). Videos render with controls.</span>
+      <span class="text-gray-400 text-right">Media saves to the repo (max 100MB). Videos render with controls.</span>
     </div>
     <textarea
       :value="modelValue"
       :rows="rows ?? 10"
-      class="w-full border p-2 font-mono"
+      class="w-full border border-gray-300 p-3 font-mono leading-relaxed focus:outline-none focus:border-black"
       @input="onInput"
     ></textarea>
     <input

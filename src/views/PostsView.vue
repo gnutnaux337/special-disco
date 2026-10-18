@@ -72,13 +72,13 @@ async function handleDelete(path: string, name: string) {
       </button>
     </div>
 
-    <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 max-w-lg">
-      <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="border p-2 font-mono" />
+    <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 w-full">
+      <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="w-full border border-gray-300 p-3 font-mono focus:outline-none focus:border-black" />
       <MarkdownEditor v-model="newContent" :rows="8" />
       <button
         :disabled="createMutation.isPending.value"
         @click="handleCreate"
-        class="underline cursor-pointer"
+        class="self-start underline cursor-pointer"
       >
         {{ createMutation.isPending.value ? 'Creating...' : 'Create' }}
       </button>
