@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import { apiFetch } from '@/lib/github'
+import RateLimitNotice from '@/components/RateLimitNotice.vue'
 
 const USERNAME = '1cedrus'
 
@@ -15,7 +16,12 @@ interface GitHubProfile {
 }
 
 // Public repo owner profile; no auth needed.
-const { data: profile } = useQuery({
+const {
+  data: profile,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['profile', USERNAME],
   queryFn: async () => {
     const res = await apiFetch(`https://api.github.com/users/${USERNAME}`)
@@ -39,13 +45,23 @@ const { data: profile } = useQuery({
 
       <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-4 text-sm">
         <span v-if="profile.location">📍 {{ profile.location }}</span>
-        <a v-if="profile.blog" :href="profile.blog" target="_blank" rel="noopener" class="underline">🌐 {{ profile.blog }}</a>
-        <a href="https://www.linkedin.com/in/1cedrus/" target="_blank" rel="noopener" class="underline">LinkedIn</a>
+        <a v-if="profile.blog" :href="profile.blog" target="_blank" rel="noopener" class="underline"
+          >🌐 {{ profile.blog }}</a
+        >
+        <a
+          href="https://www.linkedin.com/in/1cedrus/"
+          target="_blank"
+          rel="noopener"
+          class="underline"
+          >LinkedIn</a
+        >
         <a href="mailto:aowiej23s@gmail.com" class="underline">Email</a>
         <a :href="profile.html_url" target="_blank" rel="noopener" class="underline">GitHub</a>
       </div>
     </template>
 
-    <p v-else class="text-gray-400">Loading profile…</p>
+    <p v-else-if="isLoading" class="text-gray-400">Loading profile…</p>
+
+    <RateLimitNotice v-if="error" :error="error" class="w-full text-left" @retry="refetch()" />
   </main>
 </template>

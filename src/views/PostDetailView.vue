@@ -5,10 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
 import { getPost, updatePost, deletePost, fetchBytes } from '@/lib/github'
 import { isEncrypted, encryptBytes, decryptBytes } from '@/lib/crypto'
+import { encryptEmbeddedMedia } from '@/lib/postMedia'
 import { renderMarkdown } from '@/lib/markdown'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import EncryptionFields from '@/components/EncryptionFields.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
+import RateLimitNotice from '@/components/RateLimitNotice.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -20,9 +22,14 @@ const editMode = ref(false)
 const editedContent = ref('')
 const editEncrypt = ref(false)
 const editPassword = ref('')
-const saveProgress = ref<number | null>(null)
+const saveProgress = ref<{ label: string; value: number } | null>(null)
 
-const { data: post, isLoading, error } = useQuery({
+const {
+  data: post,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['post', postPath],
   queryFn: () => getPost(postPath),
   staleTime: 30_000,
@@ -35,11 +42,7 @@ const plaintext = ref<string | null>(null)
 const password = ref('')
 const locked = computed(() => encrypted.value && plaintext.value === null)
 const content = computed(() =>
-  encrypted.value
-    ? plaintext.value
-    : post.value
-      ? new TextDecoder().decode(post.value.bytes)
-      : '',
+  encrypted.value ? plaintext.value : post.value ? new TextDecoder().decode(post.value.bytes) : '',
 )
 
 const unlockInput = ref('')
@@ -102,15 +105,23 @@ async function save() {
     return
   }
   try {
-    const data = editEncrypt.value
-      ? await encryptBytes(
-          new TextEncoder().encode(editedContent.value),
-          editPassword.value,
-          (f) => {
-            saveProgress.value = f
-          },
-        )
-      : editedContent.value
+    let data: string | Uint8Array = editedContent.value
+    if (editEncrypt.value) {
+      editedContent.value = await encryptEmbeddedMedia(
+        editedContent.value,
+        editPassword.value,
+        (label, value) => {
+          saveProgress.value = { label, value }
+        },
+      )
+      data = await encryptBytes(
+        new TextEncoder().encode(editedContent.value),
+        editPassword.value,
+        (value) => {
+          saveProgress.value = { label: 'Encrypting…', value }
+        },
+      )
+    }
     await updateMutation.mutateAsync(data)
     plaintext.value = editedContent.value
     password.value = editEncrypt.value ? editPassword.value : ''
@@ -195,10 +206,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <button class="mb-4 underline cursor-pointer" @click="router.push('/posts')">← Back to Posts</button>
+    <button class="mb-4 underline cursor-pointer" @click="router.push('/posts')">
+      ← Back to Posts
+    </button>
 
     <div v-if="isLoading">Loading...</div>
-    <div v-else-if="error" class="text-red-600">{{ (error as Error).message }}</div>
+    <RateLimitNotice v-else-if="error" :error="error" @retry="refetch()" />
 
     <div v-else-if="post">
       <div class="flex items-center gap-4 mb-4">
@@ -231,15 +244,24 @@ onBeforeUnmount(() => {
         />
         <ProgressBar v-if="unlockProgress !== null" label="Decrypting…" :value="unlockProgress" />
         <div v-if="unlockError" class="text-red-600">{{ unlockError }}</div>
-        <button type="submit" class="self-start underline cursor-pointer" :disabled="unlockProgress !== null">
+        <button
+          type="submit"
+          class="self-start underline cursor-pointer"
+          :disabled="unlockProgress !== null"
+        >
           Unlock
         </button>
       </form>
 
       <div v-else-if="editMode" class="flex flex-col gap-2">
         <EncryptionFields v-model:enabled="editEncrypt" v-model:password="editPassword" />
-        <MarkdownEditor v-model="editedContent" :rows="20" :encrypt="editEncrypt" :password="editPassword" />
-        <ProgressBar v-if="saveProgress !== null" label="Encrypting…" :value="saveProgress" />
+        <MarkdownEditor
+          v-model="editedContent"
+          :rows="20"
+          :encrypt="editEncrypt"
+          :password="editPassword"
+        />
+        <ProgressBar v-if="saveProgress" :label="saveProgress.label" :value="saveProgress.value" />
         <ProgressBar v-else-if="updateMutation.isPending.value" label="Saving…" />
         <button
           :disabled="updateMutation.isPending.value"
@@ -251,7 +273,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else>
-        <ProgressBar v-if="mediaProgress" class="mb-4" :label="mediaProgress.label" :value="mediaProgress.value" />
+        <ProgressBar
+          v-if="mediaProgress"
+          class="mb-4"
+          :label="mediaProgress.label"
+          :value="mediaProgress.value"
+        />
         <div ref="body" class="post-body" v-html="rendered"></div>
       </div>
     </div>

@@ -7,7 +7,9 @@ import { listPosts, createPost, deletePost } from '@/lib/github'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import EncryptionFields from '@/components/EncryptionFields.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
+import RateLimitNotice from '@/components/RateLimitNotice.vue'
 import { encryptBytes } from '@/lib/crypto'
+import { encryptEmbeddedMedia } from '@/lib/postMedia'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -18,9 +20,14 @@ const newFilename = ref('')
 const newContent = ref('')
 const encrypt = ref(false)
 const newPassword = ref('')
-const encryptProgress = ref<number | null>(null)
+const encryptProgress = ref<{ label: string; value: number } | null>(null)
 
-const { data: posts, isLoading, error } = useQuery({
+const {
+  data: posts,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['posts', computed(() => !!auth.providerToken)],
   queryFn: listPosts,
   staleTime: 300_000,
@@ -48,19 +55,22 @@ function viewPost(path: string) {
 
 async function handleCreate() {
   if (!newFilename.value || !newContent.value) return
-  const filename = newFilename.value.endsWith('.md')
-    ? newFilename.value
-    : `${newFilename.value}.md`
+  const filename = newFilename.value.endsWith('.md') ? newFilename.value : `${newFilename.value}.md`
   if (encrypt.value && !newPassword.value) {
     alert('Enter a password, or turn encryption off.')
     return
   }
   try {
-    const content = encrypt.value
-      ? await encryptBytes(new TextEncoder().encode(newContent.value), newPassword.value, (f) => {
-          encryptProgress.value = f
-        })
-      : newContent.value
+    let content: string | Uint8Array = newContent.value
+    if (encrypt.value) {
+      const text = await encryptEmbeddedMedia(content, newPassword.value, (label, value) => {
+        encryptProgress.value = { label, value }
+      })
+      newContent.value = text
+      content = await encryptBytes(new TextEncoder().encode(text), newPassword.value, (value) => {
+        encryptProgress.value = { label: 'Encrypting…', value }
+      })
+    }
     await createMutation.mutateAsync({ filename, content })
     showCreateForm.value = false
     newFilename.value = ''
@@ -93,10 +103,18 @@ async function handleDelete(path: string, name: string) {
     </div>
 
     <div v-if="showCreateForm" class="flex flex-col gap-2 mb-4 w-full">
-      <input v-model="newFilename" placeholder="Filename (e.g. my-post.md)" class="w-full border border-gray-300 p-3 font-mono focus:outline-none focus:border-black" />
+      <input
+        v-model="newFilename"
+        placeholder="Filename (e.g. my-post.md)"
+        class="w-full border border-gray-300 p-3 font-mono focus:outline-none focus:border-black"
+      />
       <EncryptionFields v-model:enabled="encrypt" v-model:password="newPassword" />
       <MarkdownEditor v-model="newContent" :rows="8" :encrypt="encrypt" :password="newPassword" />
-      <ProgressBar v-if="encryptProgress !== null" label="Encrypting…" :value="encryptProgress" />
+      <ProgressBar
+        v-if="encryptProgress"
+        :label="encryptProgress.label"
+        :value="encryptProgress.value"
+      />
       <ProgressBar v-else-if="createMutation.isPending.value" label="Saving…" />
       <button
         :disabled="createMutation.isPending.value"
@@ -108,15 +126,19 @@ async function handleDelete(path: string, name: string) {
     </div>
 
     <div v-if="isLoading">Loading...</div>
-    <div v-if="error" class="text-red-600">{{ (error as Error).message }}</div>
+    <RateLimitNotice v-if="error" :error="error" @retry="refetch()" />
 
-    <ul v-if="!isLoading" class="list-none p-0">
+    <ul v-if="!isLoading && !error" class="list-none p-0">
       <li
         v-for="post in posts ?? []"
         :key="post.path"
         class="flex items-center justify-between py-2 border-b border-gray-200"
       >
-        <span class="underline cursor-pointer flex-1 hover:bg-gray-100" @click="viewPost(post.path)">{{ post.name }}</span>
+        <span
+          class="underline cursor-pointer flex-1 hover:bg-gray-100"
+          @click="viewPost(post.path)"
+          >{{ post.name }}</span
+        >
         <span v-if="post.createdAt" class="text-gray-400 text-sm mx-4">{{
           new Date(post.createdAt).toLocaleDateString()
         }}</span>
