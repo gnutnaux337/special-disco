@@ -5,6 +5,8 @@ const BRANCH = 'publish'
 const POSTS_PATH = 'posts'
 const [OWNER, REPO_NAME] = REPO.split('/')
 
+export const MEDIA_URL_PREFIX = `https://raw.githubusercontent.com/${OWNER}/${REPO_NAME}/${BRANCH}/${POSTS_PATH}/images/`
+
 let _octokit: Octokit | null = null
 
 let _token: string | null = null
@@ -25,15 +27,60 @@ function getToken(): string | null {
   }
 }
 
+// Thrown when GitHub refuses a read because the hourly quota is exhausted
+// (or a secondary limit kicked in). Views render a friendly notice for it
+// instead of a raw error, and should not automatically retry it.
+export class RateLimitError extends Error {
+  readonly resetAt: Date | null
+
+  constructor(resetAt: Date | null) {
+    super('GitHub rate limit reached')
+    this.name = 'RateLimitError'
+    this.resetAt = resetAt
+  }
+}
+
+function rateLimitResetAt(res: Response): Date | null {
+  // Secondary limits use Retry-After (seconds); the primary limit uses
+  // X-RateLimit-Reset (Unix seconds).
+  const retryAfter = Number(res.headers.get('retry-after'))
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return new Date(Date.now() + retryAfter * 1000)
+  const reset = Number(res.headers.get('x-ratelimit-reset'))
+  if (Number.isFinite(reset) && reset > 0) return new Date(reset * 1000)
+  return null
+}
+
+async function isRateLimited(res: Response): Promise<boolean> {
+  if (res.status !== 403 && res.status !== 429) return false
+  if (
+    res.status === 429 ||
+    res.headers.get('x-ratelimit-remaining') === '0' ||
+    res.headers.has('retry-after')
+  ) {
+    return true
+  }
+  // Secondary limits are a plain 403 whose reason is only in the body.
+  try {
+    return /rate limit/i.test(await res.clone().text())
+  } catch {
+    return false
+  }
+}
+
 // Authenticated GitHub API read (5000 req/h instead of 60). Falls back to an
 // anonymous request if the stored token is expired or revoked.
 export async function apiFetch(url: string): Promise<Response> {
   const token = getToken()
   if (token) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (res.status !== 401) return res
+    if (res.status !== 401) {
+      if (await isRateLimited(res)) throw new RateLimitError(rateLimitResetAt(res))
+      return res
+    }
   }
-  return fetch(url)
+  const res = await fetch(url)
+  if (await isRateLimited(res)) throw new RateLimitError(rateLimitResetAt(res))
+  return res
 }
 
 // Only users with push access to the repo may create, edit or delete posts.

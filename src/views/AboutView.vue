@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { apiFetch } from '@/lib/github'
+import RateLimitNotice from '@/components/RateLimitNotice.vue'
 
 const USERNAME = '1cedrus'
 
@@ -14,7 +15,12 @@ interface Repo {
   fork: boolean
 }
 
-const { data: repos, isLoading, error } = useQuery({
+const {
+  data: repos,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['repos', USERNAME],
   queryFn: async () => {
     const res = await apiFetch(
@@ -48,7 +54,7 @@ const groups = computed(() => {
     </p>
 
     <div v-if="isLoading">Loading repos…</div>
-    <div v-else-if="error" class="text-red-600">{{ (error as Error).message }}</div>
+    <RateLimitNotice v-else-if="error" :error="error" @retry="refetch()" />
 
     <div v-else class="flex flex-col gap-8">
       <section v-for="[lang, list] in groups" :key="lang">
@@ -57,17 +63,8 @@ const groups = computed(() => {
           <span class="text-sm font-normal text-gray-400">({{ list.length }})</span>
         </h2>
         <ul class="list-none p-0 flex flex-col gap-2">
-          <li
-            v-for="repo in list"
-            :key="repo.name"
-            class="border border-gray-200 rounded p-3"
-          >
-            <a
-              :href="repo.html_url"
-              target="_blank"
-              rel="noopener"
-              class="font-semibold underline"
-            >
+          <li v-for="repo in list" :key="repo.name" class="border border-gray-200 rounded p-3">
+            <a :href="repo.html_url" target="_blank" rel="noopener" class="font-semibold underline">
               {{ repo.name }}
             </a>
             <span v-if="repo.stargazers_count > 0" class="ml-2 text-sm text-yellow-600"
