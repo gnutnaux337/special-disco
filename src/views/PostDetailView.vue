@@ -159,6 +159,14 @@ const MIME: Record<string, string> = {
   webm: 'video/webm',
   ogg: 'video/ogg',
   mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  oga: 'audio/ogg',
+  flac: 'audio/flac',
+  opus: 'audio/ogg',
+  weba: 'audio/webm',
 }
 const blobUrls: string[] = []
 let run = 0

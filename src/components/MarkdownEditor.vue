@@ -18,7 +18,7 @@ async function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file || !/^(image|video)\//.test(file.type)) return
+  if (!file || !/^(image|video|audio)\//.test(file.type)) return
   if (props.encrypt && !props.password) {
     alert('Enter a password first, or turn encryption off.')
     return
@@ -58,9 +58,11 @@ async function onFile(event: Event) {
         :disabled="!!progress"
         @click="fileInput?.click()"
       >
-        Upload image/video
+        Upload image / video / audio
       </button>
-      <span class="text-gray-400 text-right">Media saves to the repo (max 100MB). Videos render with controls.</span>
+      <span class="text-gray-400 text-right"
+        >Media saves to the repo (max 100MB). Audio files (mp3, m4a, wav…) get a player.</span
+      >
     </div>
     <ProgressBar v-if="progress" :label="progress.label" :value="progress.value" />
     <textarea
@@ -72,7 +74,7 @@ async function onFile(event: Event) {
     <input
       ref="fileInput"
       type="file"
-      accept="image/*,video/*"
+      accept="image/*,video/*,audio/*"
       class="hidden"
       @change="onFile"
     />

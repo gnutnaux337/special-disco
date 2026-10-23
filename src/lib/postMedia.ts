@@ -4,9 +4,9 @@ import { encryptBytes } from '@/lib/crypto'
 export type StepProgress = (label: string, fraction: number) => void
 
 // Media uploaded while encryption was off is public. Before saving an
-// encrypted post, re-upload every such repo image/video as an encrypted `.enc`
-// copy and point the post at it. (The original file is left in the repo; it
-// must be deleted by hand, and stays in git history.)
+// encrypted post, re-upload every such repo image/video/audio as an encrypted
+// `.enc` copy and point the post at it. (The original file is left in the repo;
+// it must be deleted by hand, and stays in git history.)
 export async function encryptEmbeddedMedia(
   content: string,
   password: string,
