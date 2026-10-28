@@ -162,13 +162,45 @@ export async function listPosts(): Promise<PostSummary[]> {
   return files.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 
+// raw.githubusercontent is CDN-cached for ~5 minutes, so a post this browser
+// just committed can still come back with its old body on reload. Remember the
+// commit that wrote each post and add it to the URL: the query is only a cache
+// key, the CDN still serves the current file, and the first request for a new
+// key goes through to the origin.
+const POST_VERSION_PREFIX = 'sd-post-v:'
+
+function postVersionKey(path: string): string {
+  return `${POST_VERSION_PREFIX}${path}`
+}
+
+function rememberPostVersion(path: string, sha: string): void {
+  try {
+    localStorage.setItem(postVersionKey(path), sha)
+  } catch {}
+}
+
+function forgetPostVersion(path: string): void {
+  try {
+    localStorage.removeItem(postVersionKey(path))
+  } catch {}
+}
+
+function getPostVersion(path: string): string | null {
+  try {
+    return localStorage.getItem(postVersionKey(path))
+  } catch {
+    return null
+  }
+}
+
 // raw.githubusercontent: plain text (no base64 inflation) and browser-cacheable,
 // unlike the Contents API.
 export async function getPost(path: string): Promise<Post> {
+  const version = getPostVersion(path)
   const url = `https://raw.githubusercontent.com/${OWNER}/${REPO_NAME}/${BRANCH}/${path
     .split('/')
     .map(encodeURIComponent)
-    .join('/')}`
+    .join('/')}${version ? `?v=${encodeURIComponent(version)}` : ''}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Post not found: ${path}`)
   return {
@@ -221,7 +253,7 @@ export async function createPost(
   const octokit = getOctokit()
   const path = `${POSTS_PATH}/${filename}`
 
-  await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+  const { data } = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
     owner: OWNER,
     repo: REPO_NAME,
     path,
@@ -229,6 +261,7 @@ export async function createPost(
     content: await blobToBase64(new Blob([content as BlobPart])),
     branch: BRANCH,
   })
+  if (data.commit?.sha) rememberPostVersion(path, data.commit.sha)
 }
 
 export async function deletePost(path: string, message: string): Promise<void> {
@@ -243,6 +276,7 @@ export async function deletePost(path: string, message: string): Promise<void> {
     sha,
     branch: BRANCH,
   })
+  forgetPostVersion(path)
 }
 
 export async function updatePost(
@@ -253,7 +287,7 @@ export async function updatePost(
   const octokit = getOctokit()
   const sha = await getSha(path)
 
-  await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+  const { data } = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
     owner: OWNER,
     repo: REPO_NAME,
     path,
@@ -262,6 +296,7 @@ export async function updatePost(
     sha,
     branch: BRANCH,
   })
+  if (data.commit?.sha) rememberPostVersion(path, data.commit.sha)
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
