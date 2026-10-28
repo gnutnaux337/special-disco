@@ -7,7 +7,10 @@ import { getPost, updatePost, deletePost, fetchBytes } from '@/lib/github'
 import { isEncrypted, encryptBytes, decryptBytes } from '@/lib/crypto'
 import { encryptEmbeddedMedia } from '@/lib/postMedia'
 import { renderMarkdown } from '@/lib/markdown'
+import { parseFrontmatter } from '@/lib/postMeta'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import PostEffects from '@/components/PostEffects.vue'
+import PostMusic from '@/components/PostMusic.vue'
 import EncryptionFields from '@/components/EncryptionFields.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import RateLimitNotice from '@/components/RateLimitNotice.vue'
@@ -99,7 +102,7 @@ async function save() {
   }
   if (
     !editEncrypt.value &&
-    /\.enc\)/.test(editedContent.value) &&
+    /\.enc\b/.test(editedContent.value) &&
     !confirm("Embedded media is still encrypted and won't display in a public post. Continue?")
   ) {
     return
@@ -141,7 +144,26 @@ async function handleDelete() {
   await deleteMutation.mutateAsync()
 }
 
-const rendered = computed(() => (content.value === null ? '' : renderMarkdown(content.value)))
+// Frontmatter carries per-post presentation (effect, background music) and is
+// stripped before markdown rendering so it never shows up as text.
+const parsed = computed(() => parseFrontmatter(content.value ?? ''))
+const rendered = computed(() => renderMarkdown(parsed.value.body))
+const effect = computed(() => parsed.value.meta.effect ?? 'none')
+
+// Only http(s) tracks; the value comes from the post file, so don't hand the
+// audio element javascript: or local-file URLs.
+const musicUrl = computed(() => {
+  const url = parsed.value.meta.music
+  if (!url) return ''
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' ? parsedUrl.href : ''
+  } catch {
+    return ''
+  }
+})
+const musicEncrypted = computed(() => /\.enc(?:[?#].*)?$/i.test(musicUrl.value))
+const musicBlobUrl = ref('')
 
 // Encrypted media is downloaded, decrypted and shown through blob: URLs.
 const body = ref<HTMLElement>()
@@ -173,30 +195,41 @@ let run = 0
 
 async function decryptMedia() {
   const mine = ++run
-  const els = [...(body.value?.querySelectorAll<HTMLElement>('[data-enc-src]') ?? [])]
-  if (!els.length || !password.value) {
+  musicBlobUrl.value = ''
+  const jobs = [...(body.value?.querySelectorAll<HTMLElement>('[data-enc-src]') ?? [])].map(
+    (el) => ({
+      url: el.dataset.encSrc!,
+      apply: (blobUrl: string) => el.setAttribute('src', blobUrl),
+    }),
+  )
+  // Background music lives in frontmatter, not in the rendered body, so it is
+  // decrypted here and handed to the player as a blob URL.
+  if (musicUrl.value && musicEncrypted.value && password.value) {
+    jobs.push({ url: musicUrl.value, apply: (blobUrl) => (musicBlobUrl.value = blobUrl) })
+  }
+  if (!jobs.length || !password.value) {
     mediaProgress.value = null
     return
   }
 
   try {
-    for (let i = 0; i < els.length; i++) {
-      const el = els[i]!
-      const url = el.dataset.encSrc!
-      const label = `Decrypting media ${i + 1}/${els.length}`
-      mediaProgress.value = { label, value: i / els.length }
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i]!
+      const url = job.url
+      const label = `Decrypting media ${i + 1}/${jobs.length}`
+      mediaProgress.value = { label, value: i / jobs.length }
       // First half of each item's share is the download, second half the decrypt.
       const enc = await fetchBytes(url, (f) => {
-        mediaProgress.value = { label, value: (i + f * 0.5) / els.length }
+        mediaProgress.value = { label, value: (i + f * 0.5) / jobs.length }
       })
       const plain = await decryptBytes(enc, password.value, (f) => {
-        mediaProgress.value = { label, value: (i + 0.5 + f * 0.5) / els.length }
+        mediaProgress.value = { label, value: (i + 0.5 + f * 0.5) / jobs.length }
       })
       if (mine !== run) return
       const ext = /\.(\w+)\.enc/i.exec(url)?.[1]?.toLowerCase() ?? ''
       const blobUrl = URL.createObjectURL(new Blob([plain as BlobPart], { type: MIME[ext] }))
       blobUrls.push(blobUrl)
-      el.setAttribute('src', blobUrl)
+      job.apply(blobUrl)
     }
   } catch (e) {
     if (mine === run) alert(`Could not decrypt media: ${(e as Error).message}`)
@@ -205,7 +238,7 @@ async function decryptMedia() {
   }
 }
 
-watch([rendered, body], decryptMedia, { flush: 'post' })
+watch([rendered, musicUrl, body], decryptMedia, { flush: 'post' })
 onBeforeUnmount(() => {
   run++
   blobUrls.forEach(URL.revokeObjectURL)
@@ -281,13 +314,23 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else>
-        <ProgressBar
-          v-if="mediaProgress"
-          class="mb-4"
-          :label="mediaProgress.label"
-          :value="mediaProgress.value"
+        <div class="relative">
+          <PostEffects v-if="effect !== 'none'" :effect="effect" />
+          <div class="relative z-10">
+            <ProgressBar
+              v-if="mediaProgress"
+              class="mb-4"
+              :label="mediaProgress.label"
+              :value="mediaProgress.value"
+            />
+            <div ref="body" class="post-body" v-html="rendered"></div>
+          </div>
+        </div>
+
+        <PostMusic
+          v-if="musicUrl && (musicEncrypted ? musicBlobUrl : true)"
+          :src="musicEncrypted ? musicBlobUrl : musicUrl"
         />
-        <div ref="body" class="post-body" v-html="rendered"></div>
       </div>
     </div>
   </div>

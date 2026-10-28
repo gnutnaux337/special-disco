@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Rendered post markdown: images centered, responsive, never overflowing. */
 .post-body {
@@ -32,4 +32,102 @@
 }
 .post-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Per-post decorative layer (PostEffects.vue). Positioned by the post wrapper,
+   behind the text, and never interactive. */
+.post-effects {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.55;
+}
+.post-effect {
+  position: absolute;
+  display: block;
+  line-height: 1;
+  will-change: transform, opacity;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+.post-effect.fx-rise {
+  animation-name: fx-rise;
+}
+.post-effect.fx-snow {
+  animation-name: fx-fall;
+}
+.post-effect.fx-sparkle {
+  animation-name: fx-twinkle;
+  animation-timing-function: ease-in-out;
+}
+.post-effect.fx-bubble {
+  width: var(--fx-size);
+  height: var(--fx-size);
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.95),
+    rgba(148, 197, 255, 0.35) 55%,
+    rgba(148, 197, 255, 0.1) 78%
+  );
+  box-shadow:
+    inset 0 0 6px rgba(255, 255, 255, 0.8),
+    0 0 6px rgba(148, 197, 255, 0.35);
+  animation-name: fx-rise;
+}
+
+/* --fx-travel is the post's height, set from the component; negative delays
+   spread particles out so the field is full on the first frame. */
+@keyframes fx-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.7);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate3d(var(--fx-drift, 0px), calc(var(--fx-travel, 600px) * -0.5), 0) scale(1);
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(calc(var(--fx-drift, 0px) * -1), calc(var(--fx-travel, 600px) * -1), 0)
+      scale(1.05);
+    opacity: 0;
+  }
+}
+@keyframes fx-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--fx-drift, 0px), var(--fx-travel, 600px), 0) rotate(200deg);
+    opacity: 0.15;
+  }
+}
+@keyframes fx-twinkle {
+  0%,
+  100% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-effects {
+    display: none;
+  }
 }
