@@ -1,3 +1,7 @@
+---
+effect: snow
+music: https://raw.githubusercontent.com/gnutnaux337/special-disco/publish/posts/images/1793206472859-videoplayback.mp3
+---
 I couldn't believe that it already over 2 years since the first time I started following you guys. 
 
 That were my summer vacation in the third years of college, accidentally listen and read about u guys, I started to be fall in love with how cute u guys were, and how delightful u guys be. Scrolling and viewing all the posts about u guys, deeper and deeper, I saw u guys as a group of frends that came together to make good music. To be honest, that were one of the best summer vacation of mine.
