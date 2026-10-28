@@ -10,6 +10,7 @@ Sadly, just a couple months after that first day, I couldnt see u guys happly ju
 
 Even though things didnt turn out the way we had hoped, I still wish that one day, I could see u guys on stage together again, all 5 members as one.
 
+- Danielle Marsh - Stay (Live) -
 
 ![866456018_1745633800897487_791073628979975320_n](https://raw.githubusercontent.com/gnutnaux337/special-disco/publish/posts/images/1793205348423-866456018_1745633800897487_791073628979975320_n.jpg)
 
